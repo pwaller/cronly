@@ -154,6 +154,10 @@ func main() {
 
 	// Read cron
 	crontabs := ReadCrontabs(*crontabsPath)
+	if *verbose {
+		log.Println("Have", len(crontabs), "crontabs")
+	}
+
 	queue := *NewJobsFromCrontabs(crontabs)
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
@@ -204,7 +208,11 @@ func main() {
 		jobsThisIteration := queue.NextJobs()
 
 		if *verbose {
-			log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+			if *medium || *fast {
+				log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+			} else {
+				log.Printf("Invoking %v jobs", jobsThisIteration.Len())
+			}
 		}
 
 		if !*dryRun {
