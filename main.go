@@ -83,6 +83,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/howeyc/fsnotify"
@@ -120,6 +121,12 @@ func main() {
 
 		go func() {
 			for event := range watcher.Event {
+				if strings.HasPrefix(event.Name, filepath.Join(*crontabsPath, "tmp.")) {
+					if *verbose {
+						log.Println("Skipping tmp", event.Name)
+					}
+					continue
+				}
 				newCrontab <- event.Name
 			}
 		}()
