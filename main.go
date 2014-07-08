@@ -121,7 +121,12 @@ func main() {
 
 		go func() {
 			for event := range watcher.Event {
+				if event.Name == *crontabsPath {
+					// Don't follow the directory itself
+					continue
+				}
 				if strings.HasPrefix(event.Name, filepath.Join(*crontabsPath, "tmp.")) {
+					// Don't watch tmp. files
 					if *verbose {
 						log.Println("Skipping tmp", event.Name)
 					}
