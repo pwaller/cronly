@@ -151,11 +151,15 @@ func main() {
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
 
-	runTime := queue.Top().nextRun
-
 	// Main loop
-	for done != nil && queue.Len() > 0 { // && runTime.Before(finish) {
-		runTime = queue.Top().nextRun
+	for done != nil { // && runTime.Before(finish) {
+		var runTime time.Time
+		if queue.Len() > 0 {
+			runTime = queue.Top().nextRun
+		} else {
+			// If there is nothing in the schedule, wait 500ms.
+			runTime = time.Now().Add(500 * time.Millisecond)
+		}
 
 		wait := -time.Since(runTime)
 
