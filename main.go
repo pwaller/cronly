@@ -178,6 +178,8 @@ func main() {
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
 
+	var newCrontabs int
+
 	// Main loop
 	for done != nil { // && runTime.Before(finish) {
 		var runTime time.Time
@@ -202,7 +204,8 @@ func main() {
 			return
 
 		case crontab := <-newCrontab:
-			log.Println("New crontab:", crontab)
+			// log.Println("New crontab:", crontab)
+			newCrontabs++
 
 			// UpdateCrontab needs to know the epoch for new jobs.
 			// This is arranged such that new jobs just appearing,
@@ -225,9 +228,9 @@ func main() {
 
 		if *verbose {
 			if *medium || *fast {
-				log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+				log.Printf("At %v invoking %v jobs (%d new crontabs)", runTime, jobsThisIteration.Len(), newCrontabs)
 			} else {
-				log.Printf("Invoking %v jobs", jobsThisIteration.Len())
+				log.Printf("Invoking %v jobs (%d new crontabs)", jobsThisIteration.Len(), newCrontabs)
 			}
 		}
 
@@ -247,5 +250,6 @@ func main() {
 		}
 
 		jobsInvoked += jobsThisIteration.Len()
+		newCrontabs = 0
 	}
 }
