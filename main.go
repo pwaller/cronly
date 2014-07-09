@@ -129,9 +129,6 @@ func main() {
 				}
 				if strings.HasPrefix(event.Name, filepath.Join(*crontabsPath, "tmp.")) {
 					// Don't watch tmp. files
-					if *verbose {
-						log.Println("Skipping tmp", event.Name)
-					}
 					continue
 				}
 				newCrontab <- event.Name
