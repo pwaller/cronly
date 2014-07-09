@@ -17,6 +17,8 @@ type Jobs struct {
 	CrontabMapping map[string]map[*Job]struct{}
 }
 
+var EmptyJobs = Jobs{[]*Job{}, map[string]map[*Job]struct{}{}}
+
 func NewJobsFromCrontabs(crontabs []Crontab) *Jobs {
 	jobs := &Jobs{[]*Job{}, map[string]map[*Job]struct{}{}}
 
@@ -83,6 +85,9 @@ func (jobs *Jobs) Pop() interface{} {
 
 // Return the next batch of jobs to run
 func (jobs *Jobs) NextJobs() Jobs {
+	if jobs.Len() == 0 {
+		return EmptyJobs
+	}
 
 	runTime := jobs.Top().nextRun
 

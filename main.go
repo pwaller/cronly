@@ -83,6 +83,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/howeyc/fsnotify"
@@ -120,6 +121,17 @@ func main() {
 
 		go func() {
 			for event := range watcher.Event {
+				if event.Name == *crontabsPath {
+					// Don't follow the directory itself
+					continue
+				}
+				if strings.HasPrefix(event.Name, filepath.Join(*crontabsPath, "tmp.")) {
+					// Don't watch tmp. files
+					if *verbose {
+						log.Println("Skipping tmp", event.Name)
+					}
+					continue
+				}
 				newCrontab <- event.Name
 			}
 		}()
@@ -147,15 +159,23 @@ func main() {
 
 	// Read cron
 	crontabs := ReadCrontabs(*crontabsPath)
+	if *verbose {
+		log.Println("Have", len(crontabs), "crontabs")
+	}
+
 	queue := *NewJobsFromCrontabs(crontabs)
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
 
-	runTime := queue.Top().nextRun
-
 	// Main loop
-	for done != nil && queue.Len() > 0 { // && runTime.Before(finish) {
-		runTime = queue.Top().nextRun
+	for done != nil { // && runTime.Before(finish) {
+		var runTime time.Time
+		if queue.Len() > 0 {
+			runTime = queue.Top().nextRun
+		} else {
+			// If there is nothing in the schedule, wait 500ms.
+			runTime = time.Now().Add(500 * time.Millisecond)
+		}
 
 		wait := -time.Since(runTime)
 
@@ -193,7 +213,11 @@ func main() {
 		jobsThisIteration := queue.NextJobs()
 
 		if *verbose {
-			log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+			if *medium || *fast {
+				log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+			} else {
+				log.Printf("Invoking %v jobs", jobsThisIteration.Len())
+			}
 		}
 
 		if !*dryRun {
