@@ -178,10 +178,6 @@ func main() {
 		log.Fatalln("Unable to determine hostname:", err)
 	}
 	topic := fmt.Sprintf("cron.%s", hostname)
-	err = nsqProducer.MultiPublish(topic, [][]byte{[]byte("hello, world")})
-	if err != nil {
-		log.Println("Error:", err)
-	}
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
 
@@ -240,6 +236,17 @@ func main() {
 
 		if !*dryRun {
 			jobsThisIteration.Invoke(&queue)
+			message, err := jobsThisIteration.Marshal()
+			if err != nil {
+				log.Println("Marshal Error:", err)
+				continue
+			}
+
+			err = nsqProducer.MultiPublish(topic, message)
+			if err != nil {
+				log.Println("Publish Error:", err)
+				continue
+			}
 		}
 
 		jobsInvoked += jobsThisIteration.Len()

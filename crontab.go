@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -30,6 +31,18 @@ type Job struct {
 	nextRun time.Time
 }
 type Crontab []*Job
+
+func (j *Job) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		User   string            `json: "User"`
+		Env    map[string]string `json:"Env"`
+		Script string            `json:"Script"`
+	}{
+		User:   path.Base(j.crontab),
+		Env:    j.environment,
+		Script: j.script,
+	})
+}
 
 var ErrNotEnoughFields = errors.New("not enough fields")
 
