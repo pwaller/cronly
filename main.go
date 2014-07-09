@@ -208,11 +208,17 @@ func main() {
 			newCrontabs++
 
 			// UpdateCrontab needs to know the epoch for new jobs.
-			// This is arranged such that new jobs just appearing,
-			// who might be scheduled in the immediate past measured
-			// in realtime, may have their next runtime equal to
-			// `runTime`, thus allowing them to run in the next batch.
-			queue.UpdateCrontab(runTime, crontab)
+			// We use `after` to ensure that new jobs just appearing will have
+			// their next runtime in the future (and in particular, have the
+			// opportunity to next run before the current top of queue).
+			after := time.Now()
+			if *fast {
+				// When fast we have to fiddle it (because we're not using wall clock
+				// time); we use the time when we would next consider running
+				// something (so that they can pop up after the next batch).
+				after = runTime
+			}
+			queue.UpdateCrontab(after, crontab)
 			continue
 
 		case <-fastChan:
