@@ -79,6 +79,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -86,6 +87,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitly/go-nsq"
 	"github.com/howeyc/fsnotify"
 )
 
@@ -164,6 +166,22 @@ func main() {
 	}
 
 	queue := *NewJobsFromCrontabs(crontabs)
+
+	nsqConfig := nsq.NewConfig()
+	nsqProducer, err := nsq.NewProducer("localhost:nsq", nsqConfig)
+	if err != nil {
+		log.Fatalln("Unable to connect to nsq")
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalln("Unable to determine hostname:", err)
+	}
+	topic := fmt.Sprintf("cron.%s", hostname)
+	err = nsqProducer.MultiPublish(topic, [][]byte{[]byte("hello, world")})
+	if err != nil {
+		log.Println("Error:", err)
+	}
 
 	// finish := time.Now().Add(1 * 24 * time.Hour)
 
