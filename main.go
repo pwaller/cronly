@@ -79,6 +79,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -86,6 +87,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitly/go-nsq"
 	"github.com/howeyc/fsnotify"
 )
 
@@ -127,9 +129,6 @@ func main() {
 				}
 				if strings.HasPrefix(event.Name, filepath.Join(*crontabsPath, "tmp.")) {
 					// Don't watch tmp. files
-					if *verbose {
-						log.Println("Skipping tmp", event.Name)
-					}
 					continue
 				}
 				newCrontab <- event.Name
@@ -165,7 +164,21 @@ func main() {
 
 	queue := *NewJobsFromCrontabs(crontabs)
 
+	nsqConfig := nsq.NewConfig()
+	nsqProducer, err := nsq.NewProducer("localhost:nsq", nsqConfig)
+	if err != nil {
+		log.Fatalln("Unable to connect to nsq")
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalln("Unable to determine hostname:", err)
+	}
+	topic := fmt.Sprintf("cron.%s", hostname)
+
 	// finish := time.Now().Add(1 * 24 * time.Hour)
+
+	var newCrontabs int
 
 	// Main loop
 	for done != nil { // && runTime.Before(finish) {
@@ -191,14 +204,21 @@ func main() {
 			return
 
 		case crontab := <-newCrontab:
-			log.Println("New crontab:", crontab)
+			// log.Println("New crontab:", crontab)
+			newCrontabs++
 
 			// UpdateCrontab needs to know the epoch for new jobs.
-			// This is arranged such that new jobs just appearing,
-			// who might be scheduled in the immediate past measured
-			// in realtime, may have their next runtime equal to
-			// `runTime`, thus allowing them to run in the next batch.
-			queue.UpdateCrontab(runTime, crontab)
+			// We use `after` to ensure that new jobs just appearing will have
+			// their next runtime in the future (and in particular, have the
+			// opportunity to next run before the current top of queue).
+			after := time.Now()
+			if *fast {
+				// When fast we have to fiddle it (because we're not using wall clock
+				// time); we use the time when we would next consider running
+				// something (so that they can pop up after the next batch).
+				after = runTime
+			}
+			queue.UpdateCrontab(after, crontab)
 			continue
 
 		case <-fastChan:
@@ -214,16 +234,28 @@ func main() {
 
 		if *verbose {
 			if *medium || *fast {
-				log.Printf("At %v invoking %v jobs", runTime, jobsThisIteration.Len())
+				log.Printf("At %v invoking %v jobs (%d new crontabs)", runTime, jobsThisIteration.Len(), newCrontabs)
 			} else {
-				log.Printf("Invoking %v jobs", jobsThisIteration.Len())
+				log.Printf("Invoking %v jobs (%d new crontabs)", jobsThisIteration.Len(), newCrontabs)
 			}
 		}
 
 		if !*dryRun {
 			jobsThisIteration.Invoke(&queue)
+			message, err := jobsThisIteration.Marshal()
+			if err != nil {
+				log.Println("Marshal Error:", err)
+				continue
+			}
+
+			err = nsqProducer.MultiPublish(topic, message)
+			if err != nil {
+				log.Println("Publish Error:", err)
+				continue
+			}
 		}
 
 		jobsInvoked += jobsThisIteration.Len()
+		newCrontabs = 0
 	}
 }

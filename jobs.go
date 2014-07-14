@@ -19,6 +19,17 @@ type Jobs struct {
 
 var EmptyJobs = Jobs{[]*Job{}, map[string]map[*Job]struct{}{}}
 
+func (js *Jobs) Marshal() (result [][]byte, err error) {
+	result = make([][]byte, len(js.List))
+	for i, j := range js.List {
+		result[i], err = j.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
 func NewJobsFromCrontabs(crontabs []Crontab) *Jobs {
 	jobs := &Jobs{[]*Job{}, map[string]map[*Job]struct{}{}}
 
